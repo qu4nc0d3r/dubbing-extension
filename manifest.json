@@ -3,11 +3,40 @@
   "name": "Lồng tiếng Anh → Việt",
   "version": "0.1.0",
   "description": "Lồng tiếng Việt realtime cho video tiếng Anh dựa trên phụ đề.",
-  "permissions": ["storage", "offscreen"],
-  "host_permissions": ["https://translate.googleapis.com/*"],
-  "background": { "service_worker": "background.js" },
-  "action": { "default_popup": "popup.html" },
+  "permissions": [
+    "storage",
+    "offscreen"
+  ],
+  "host_permissions": [
+    "https://translate.googleapis.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html"
+  },
   "content_scripts": [
-    { "matches": ["<all_urls>"], "js": ["captions.js", "content.js"], "all_frames": true }
+    {
+      "matches": [
+        "https://www.youtube.com/*"
+      ],
+      "js": [
+        "youtube.js"
+      ],
+      "world": "MAIN",
+      "run_at": "document_start",
+      "all_frames": true
+    },
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "captions.js",
+        "content.js"
+      ],
+      "all_frames": true
+    }
   ]
 }
