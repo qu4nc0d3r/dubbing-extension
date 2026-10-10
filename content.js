@@ -32,7 +32,8 @@ function trackCues(v) {
 function tick() {
   const v = activeVideo();
   if (!v || v.paused || document.querySelector('.ad-showing')) return; // YouTube ads reuse the video element
-  if (!ducked.has(v)) { ducked.set(v, v.volume); v.volume *= duck; }
+  // YouTube re-applies its own volume (e.g. after ads), so re-duck whenever the volume isn't what we set.
+  if (!ducked.has(v) || Math.abs(v.volume - ducked.get(v) * duck) > 0.01) { ducked.set(v, v.volume); v.volume *= duck; }
   const t = v.currentTime, plan = ytPlan.length ? ytPlan : toSentences(trackCues(v));
   if (!plan.length) return liveCaptions(v, t);
   plan.forEach((s, i) => {
