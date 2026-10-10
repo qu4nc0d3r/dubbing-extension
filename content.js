@@ -1,5 +1,5 @@
 const DEFAULTS = { on: false, duck: 0.2 };
-let duck = DEFAULTS.duck, timer, ytPlan = [], loaded = new Set(), fired = '', prev = '', buf = [], bufStart = 0, lastNew = 0;
+let duck = DEFAULTS.duck, timer, inAd = false, ytPlan = [], loaded = new Set(), fired = '', prev = '', buf = [], bufStart = 0, lastNew = 0;
 const ducked = new Map(); // video -> volume before ducking
 
 const send = (msg) => chrome.runtime.sendMessage(msg).catch(() => {}); // worker restarting / extension reloaded
@@ -31,7 +31,10 @@ function trackCues(v) {
 
 function tick() {
   const v = activeVideo();
-  if (!v || v.paused || document.querySelector('.ad-showing')) return; // YouTube ads reuse the video element
+  // YouTube ads reuse the video element and may start without a pause event: silence the sentence in progress and wait.
+  if (document.querySelector('.ad-showing')) { if (!inAd) send({ type: 'stop' }); inAd = true; return; }
+  inAd = false;
+  if (!v || v.paused) return;
   // YouTube re-applies its own volume (e.g. after ads), so re-duck whenever the volume isn't what we set.
   if (!ducked.has(v) || Math.abs(v.volume - ducked.get(v) * duck) > 0.01) { ducked.set(v, v.volume); v.volume *= duck; }
   const t = v.currentTime, plan = ytPlan.length ? ytPlan : toSentences(trackCues(v));
