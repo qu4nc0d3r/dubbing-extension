@@ -4,23 +4,25 @@ async function translate(text) {
   return (await r.json())[0].map((s) => s[0]).join('');
 }
 
-let chain = Promise.resolve(), gen = 0, queue = [], speaking = false;
+const translations = new Map(); // sentence id -> Promise<vi>, shared by its 'load' (ahead of time) and 'play'
+function vi(id, text) {
+  if (!translations.has(id)) {
+    translations.set(id, translate(text).catch((e) => { translations.delete(id); console.warn('translate failed', e); return ''; }));
+  }
+  return translations.get(id);
+}
 
-function next() {
-  if (speaking || !queue.length) return;
-  speaking = true;
-  chrome.tts.speak(queue.shift(), {
-    lang: 'vi-VN',
-    rate: Math.min(1.15 + queue.length * 0.3, 2), // speed up when falling behind the video
-    onEvent: (e) => {
-      if (['end', 'interrupted', 'cancelled', 'error'].includes(e.type)) { speaking = false; next(); }
-    },
-  });
+let creating;
+// MV3 service workers can't play audio, so playback lives in an offscreen document (Chrome closes it when idle).
+async function toOffscreen(msg) {
+  if (!(await chrome.offscreen.hasDocument())) {
+    if (!msg.vi) return; // nothing is playing, so nothing to stop
+    await (creating ??= chrome.offscreen.createDocument({ url: 'offscreen.html', reasons: ['AUDIO_PLAYBACK'], justification: 'Phát giọng đọc tiếng Việt' }).finally(() => (creating = null)));
+  }
+  chrome.runtime.sendMessage({ ...msg, target: 'offscreen' }).catch((e) => console.warn('offscreen message failed', e));
 }
 
 chrome.runtime.onMessage.addListener((msg) => {
-  if (msg.type === 'stop') { gen++; queue = []; chrome.tts.stop(); return; }
-  // Translate in parallel but speak in arrival order; drop results that land after a stop.
-  const g = gen, p = translate(msg.text).catch((e) => (console.warn('translate failed', e), ''));
-  chain = chain.then(() => p).then((vi) => { if (vi && g === gen) { queue.push(vi); next(); } });
+  if (!msg.text) return void toOffscreen(msg); // stop / reset
+  vi(msg.id, msg.text).then((t) => t && toOffscreen({ ...msg, vi: t }));
 });
