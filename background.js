@@ -4,23 +4,20 @@ async function translate(text) {
   return (await r.json())[0].map((s) => s[0]).join('');
 }
 
-let chain = Promise.resolve(), gen = 0, queue = [], speaking = false;
-
-function next() {
-  if (speaking || !queue.length) return;
-  speaking = true;
-  chrome.tts.speak(queue.shift(), {
-    lang: 'vi-VN',
-    rate: Math.min(1.15 + queue.length * 0.3, 2), // speed up when falling behind the video
-    onEvent: (e) => {
-      if (['end', 'interrupted', 'cancelled', 'error'].includes(e.type)) { speaking = false; next(); }
-    },
-  });
+// MV3 service workers can't play audio, so playback lives in an offscreen document (Chrome closes it when idle).
+async function speak(text) {
+  if (!(await chrome.offscreen.hasDocument())) {
+    await chrome.offscreen.createDocument({ url: 'offscreen.html', reasons: ['AUDIO_PLAYBACK'], justification: 'Phát giọng đọc tiếng Việt' });
+  }
+  chrome.runtime.sendMessage({ type: 'play', text }).catch((e) => console.warn('play failed', e));
 }
 
+let chain = Promise.resolve(), gen = 0;
+
 chrome.runtime.onMessage.addListener((msg) => {
-  if (msg.type === 'stop') { gen++; queue = []; chrome.tts.stop(); return; }
+  if (msg.type === 'stop') { gen++; return; } // offscreen.js receives the same message and silences playback
+  if (msg.type !== 'say') return;
   // Translate in parallel but speak in arrival order; drop results that land after a stop.
   const g = gen, p = translate(msg.text).catch((e) => (console.warn('translate failed', e), ''));
-  chain = chain.then(() => p).then((vi) => { if (vi && g === gen) { queue.push(vi); next(); } });
+  chain = chain.then(() => p).then((vi) => vi && g === gen && speak(vi)).catch((e) => console.warn('speak failed', e));
 });
