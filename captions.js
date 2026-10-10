@@ -10,12 +10,16 @@ function newWords(prev, next) {
 }
 
 // YouTube json3 caption track -> cues in seconds; auto captions arrive word by word via tOffsetMs.
+// Styled captions pad lines with zero-width spaces and repeat them as outline/shadow layers: strip and de-duplicate.
 function json3Cues(json) {
-  const cues = [];
+  const cues = [], seen = new Set();
   for (const e of json.events || []) {
     for (const s of e.segs || []) {
-      const text = (s.utf8 || '').trim();
-      if (text) cues.push({ start: (e.tStartMs + (s.tOffsetMs || 0)) / 1000, end: (e.tStartMs + (e.dDurationMs || 0)) / 1000, text });
+      const text = (s.utf8 || '').replace(/[\u200b-\u200f\u2060\ufeff]/g, '').trim();
+      const start = (e.tStartMs + (s.tOffsetMs || 0)) / 1000;
+      if (!text || seen.has(start + '|' + text)) continue;
+      seen.add(start + '|' + text);
+      cues.push({ start, end: (e.tStartMs + (e.dDurationMs || 0)) / 1000, text });
     }
   }
   return cues;

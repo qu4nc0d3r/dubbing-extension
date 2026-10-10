@@ -29,3 +29,9 @@ test('long sentences are capped at 10s', () => {
   const cues = Array.from({ length: 12 }, (_, i) => ({ start: i, end: i + 1, text: 'word,' })).concat({ start: 12, end: 13, text: 'end.' });
   assert.deepStrictEqual(toSentences(cues).map((s) => s.start), [0, 11]);
 });
+
+test('styled captions: zero-width padding stripped and outline/shadow copies dropped', () => {
+  const line = { utf8: '​ ​Red light.​ ​' };
+  const json = { events: [{ tStartMs: 1000, dDurationMs: 2000, wpWinPosId: 1, segs: [line] }, { tStartMs: 1000, dDurationMs: 2000, wpWinPosId: 2, segs: [line] }, { tStartMs: 3000, dDurationMs: 2000, segs: [{ utf8: '​Green light.​' }] }] };
+  assert.deepStrictEqual(toSentences(json3Cues(json)).map((s) => s.text), ['Red light.', 'Green light.']);
+});
