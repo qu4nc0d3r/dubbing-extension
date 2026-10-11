@@ -36,6 +36,9 @@
         "captions.js",
         "content.js"
       ],
+      "css": [
+        "content.css"
+      ],
       "all_frames": true
     }
   ]

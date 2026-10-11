@@ -1,6 +1,7 @@
 const DEFAULTS = { on: false, duck: 0.2 };
 let duck = DEFAULTS.duck, timer, inAd = false, ytPlan = [], loaded = new Set(), fired = '', prev = '', buf = [], bufStart = 0, lastNew = 0;
 const ducked = new Map(); // video -> volume before ducking
+const shown = new Set(); // caption tracks we hid, shown again when dubbing is switched off
 
 const send = (msg) => chrome.runtime.sendMessage(msg).catch(() => {}); // worker restarting / extension reloaded
 
@@ -25,7 +26,8 @@ function trackCues(v) {
   const tracks = [...v.textTracks].filter((t) => t.kind === 'subtitles' || t.kind === 'captions');
   const t = tracks.find((t) => t.mode !== 'disabled') || tracks.find((t) => /^en/i.test(t.language)) || tracks[0];
   if (!t) return [];
-  if (t.mode === 'disabled') t.mode = 'hidden'; // load cues without drawing them
+  if (t.mode === 'showing') shown.add(t);
+  t.mode = 'hidden'; // load cues without drawing them
   return [...(t.cues || [])].map((c) => ({ start: c.startTime, end: c.endTime, text: c.text.replace(/<[^>]+>/g, '').trim() })).filter((c) => c.text);
 }
 
@@ -70,6 +72,8 @@ function apply(s) {
   for (const [v, vol] of ducked) v.volume = vol;
   ducked.clear();
   if (!s.on && timer) reset(); // only when switching off, not on every page load
+  if (!s.on) { for (const t of shown) t.mode = 'showing'; shown.clear(); }
+  document.documentElement.toggleAttribute('data-dubbing', s.on); // content.css hides YouTube's caption box
   clearInterval(timer);
   timer = s.on && setInterval(tick, 100);
 }

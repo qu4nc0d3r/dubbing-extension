@@ -1,0 +1,2 @@
+/* While dubbing, YouTube keeps downloading and rendering captions (the dub reads them) but they stay off screen. */
+html[data-dubbing] .ytp-caption-window-container { display: none !important; }
